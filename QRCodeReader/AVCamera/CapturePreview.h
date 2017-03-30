@@ -12,6 +12,6 @@
 @interface CapturePreview : UIView
 
 @property (nonatomic, readonly) AVCaptureVideoPreviewLayer *videoPreviewLayer;
-@property (nonatomic) AVCaptureSession *session;
+@property (nonatomic, weak) AVCaptureSession *session;
 
 @end
