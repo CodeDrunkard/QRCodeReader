@@ -8,8 +8,18 @@
 
 #import <UIKit/UIKit.h>
 
+#define EnumRawValue(enum) [@[@"Native", @"ZBar", @"ZXing"] objectAtIndex:enum]
+
+typedef NS_ENUM(NSUInteger, QRCodeReaderType) {
+    QRCodeReaderTypeNative,
+    QRCodeReaderTypeZBar,
+    QRCodeReaderTypeZXing,
+};
+
 @interface DetailViewController : UIViewController
 
+@property (nonatomic, assign) QRCodeReaderType type;
+@property (nonatomic, strong) NSString *typeString;
 @property (weak, nonatomic) IBOutlet UILabel *detailDescriptionLabel;
 
 @end

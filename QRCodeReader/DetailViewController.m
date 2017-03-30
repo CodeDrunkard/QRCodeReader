@@ -7,19 +7,28 @@
 //
 
 #import "DetailViewController.h"
+
 #import "Capture.h"
 #import "CapturePreview.h"
 
-@interface DetailViewController () <AVCaptureMetadataOutputObjectsDelegate>
+#import <ZBarSDK/ZBarCaptureReader.h>
+
+@interface DetailViewController () <AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureMetadataOutputObjectsDelegate, ZBarCaptureDelegate>
 
 @property (nonatomic, strong) Capture *capture;
 @property (nonatomic, strong) CapturePreview *capturePreview;
+@property (nonatomic, strong) AVCaptureVideoDataOutput *captureVideoDataOutput;
 @property (nonatomic, strong) AVCaptureMetadataOutput *captureMetadataOutput;
+
+@property (nonatomic, strong) ZBarCaptureReader *zbarReader;
 
 @end
 
 @implementation DetailViewController {
     dispatch_queue_t _captureQueue;
+    int _skipCount;
+    int _skipMaxCount;
+    BOOL _scanEnable;
 }
 
 - (void)viewDidLoad {
@@ -30,6 +39,7 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [UIApplication sharedApplication].idleTimerDisabled = YES;
     
     [self checkCaptureSetupResult];
 }
@@ -42,10 +52,21 @@
 
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
+    [UIApplication sharedApplication].idleTimerDisabled = NO;
     
     [self deinitCamera];
 }
 
+- (void)setTypeString:(NSString *)typeString {
+    _typeString = typeString;
+    if ([_typeString isEqualToString:EnumRawValue(QRCodeReaderTypeNative)]) {
+        self.type = QRCodeReaderTypeNative;
+    } else if ([_typeString isEqualToString:EnumRawValue(QRCodeReaderTypeZBar)]) {
+        self.type = QRCodeReaderTypeZBar;
+    } else if ([_typeString isEqualToString:EnumRawValue(QRCodeReaderTypeZXing)]) {
+        self.type = QRCodeReaderTypeZXing;
+    }
+}
 
 #pragma mark - Camera Config
 
@@ -64,7 +85,18 @@
         self.capturePreview.backgroundColor = [UIColor blackColor];
         
         dispatch_async( _captureQueue, ^{
-            [self configCaptureMetadataOutput];
+            switch (self.type) {
+                case QRCodeReaderTypeNative:
+                    [self configCaptureMetadataOutput];
+                    break;
+                case QRCodeReaderTypeZBar:
+                    [self initZBar];
+                    [self configCaptureVideoDataOutput];
+                    break;
+                case QRCodeReaderTypeZXing:
+                    
+                    break;
+            }
         });
     }
 }
@@ -91,6 +123,48 @@
     
     [self.captureMetadataOutput setMetadataObjectsDelegate:self queue:_captureQueue];
     self.captureMetadataOutput.metadataObjectTypes = [NSArray arrayWithObject:AVMetadataObjectTypeQRCode];
+    
+    [self.capture.session commitConfiguration];
+}
+
+- (void)configCaptureVideoDataOutput {
+    if ( self.capture.setupResult != CaptureSetupResultSuccess ) {
+        return;
+    }
+    
+    [self.capture.session beginConfiguration];
+    
+    self.captureVideoDataOutput = [[AVCaptureVideoDataOutput alloc] init];
+    [self.captureVideoDataOutput setVideoSettings:[NSDictionary dictionaryWithObject: [NSNumber numberWithInt: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
+                                                                              forKey: (NSString *)kCVPixelBufferPixelFormatTypeKey]];
+    [self.captureVideoDataOutput setSampleBufferDelegate:self queue:_captureQueue];
+    
+    if ([self.capture.session canAddOutput:self.captureVideoDataOutput]) {
+        [self.capture.session addOutput:self.captureVideoDataOutput];
+    } else {
+#if DEBUG
+        NSLog( @"Could not add video device output to the session" );
+#endif
+        self.capture.setupResult = CaptureSetupResultSessionConfigurationFailed;
+        [self.capture.session commitConfiguration];
+        return;
+    }
+    
+    /*
+     Use the status bar orientation as the initial video orientation. Subsequent orientation changes are
+     handled by -[AVCamCameraViewController viewWillTransitionToSize:withTransitionCoordinator:].
+     */
+    UIInterfaceOrientation statusBarOrientation = [UIApplication sharedApplication].statusBarOrientation;
+    AVCaptureVideoOrientation initialVideoOrientation = AVCaptureVideoOrientationPortrait;
+    if ( statusBarOrientation != UIInterfaceOrientationUnknown ) {
+        initialVideoOrientation = (AVCaptureVideoOrientation)statusBarOrientation;
+    }
+    self.capturePreview.videoPreviewLayer.connection.videoOrientation = initialVideoOrientation;
+    
+    AVCaptureConnection *videoConnection = [self.captureVideoDataOutput connectionWithMediaType:AVMediaTypeVideo];
+    if ([videoConnection isVideoOrientationSupported]) {
+        videoConnection.videoOrientation = AVCaptureVideoOrientationLandscapeRight;
+    }
     
     [self.capture.session commitConfiguration];
 }
@@ -137,8 +211,6 @@
 - (void)deinitCamera {
     dispatch_async( _captureQueue, ^{
         if (self.capture.setupResult != CaptureSetupResultSuccess) {
-            [self.capture.session removeOutput:self.captureMetadataOutput];
-            self.captureMetadataOutput = nil;
             self.capturePreview.session = nil;
             self.capturePreview = nil;
             [self.capture close];
@@ -147,10 +219,31 @@
 }
 
 
+#pragma mark - ZBar config
+
+- (void)initZBar {
+    self.zbarReader = [[ZBarCaptureReader alloc] init];
+    self.zbarReader.captureDelegate = self;
+    self.zbarReader.enableReader = YES;
+    
+    _skipCount = 0;
+    _skipMaxCount = 3;
+    _scanEnable = YES;
+}
+
+
 #pragma mark - AVCaptureVideoDataOutputSampleBufferDelegate
 
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection {
-    // do some things, like get sreenshot.
+    if (_scanEnable && self.type == QRCodeReaderTypeZBar) {
+        _skipCount++;
+        if (_skipCount > _skipMaxCount) {
+            _skipCount = 0;
+            [(id<AVCaptureVideoDataOutputSampleBufferDelegate>)_zbarReader captureOutput:captureOutput
+                                                                   didOutputSampleBuffer:sampleBuffer
+                                                                          fromConnection:connection];
+        }
+    }
 }
 
 
@@ -165,7 +258,22 @@
     AVMetadataMachineReadableCodeObject *metadataObject = metadataObjects.firstObject;
     if ([AVMetadataObjectTypeQRCode isEqualToString:metadataObject.type]) {
         NSString *value = metadataObject.stringValue;
-        NSLog(@"metadataObject value: %@", value);
+        NSLog(@"AVFoundation scan result is: %@", value);
+    }
+}
+
+
+#pragma mark - ZBarCaptureDelegate
+
+- (void)captureReader:(ZBarCaptureReader *)captureReader didReadNewSymbolsFromImage:(ZBarImage *)image {
+    for (ZBarSymbol *sym in captureReader.scanner.results) {
+        NSLog(@"ZBar scan result is : %@", sym.data);
+    }
+}
+
+- (void)captureReader:(ZBarCaptureReader *)captureReader didTrackSymbols:(ZBarSymbolSet *)symbols {
+    for (ZBarSymbol *sym in symbols) {
+        NSLog(@"ZBar scan result is : %@", sym.data);
     }
 }
 

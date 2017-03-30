@@ -17,7 +17,26 @@
 		6B58CDA41E8CBD1900963B53 /* Capture.m in Sources */ = {isa = PBXBuildFile; fileRef = 6B58CDA11E8CBD1900963B53 /* Capture.m */; };
 		6B58CDA51E8CBD1900963B53 /* CapturePreview.m in Sources */ = {isa = PBXBuildFile; fileRef = 6B58CDA31E8CBD1900963B53 /* CapturePreview.m */; };
 		6B58CDA71E8CC69E00963B53 /* QRCodeReader.png in Resources */ = {isa = PBXBuildFile; fileRef = 6B58CDA61E8CC69E00963B53 /* QRCodeReader.png */; };
+		6B58CDB41E8CD6B800963B53 /* libzbar.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 6B58CDB01E8CCED400963B53 /* libzbar.a */; };
+		6B58CDB81E8CDA0300963B53 /* libiconv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 6B58CDB71E8CDA0300963B53 /* libiconv.tbd */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		6B58CDAF1E8CCED400963B53 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6B58CDA81E8CCED300963B53 /* zbar.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = D2AAC07E0554694100DB518D;
+			remoteInfo = libzbar;
+		};
+		6B58CDB11E8CCED400963B53 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6B58CDA81E8CCED300963B53 /* zbar.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = DC3CEF9D121633C500D7A786;
+			remoteInfo = readertest;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		6B58CD821E8CB83300963B53 /* QRCodeReader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QRCodeReader.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -37,6 +56,8 @@
 		6B58CDA21E8CBD1900963B53 /* CapturePreview.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CapturePreview.h; sourceTree = "<group>"; };
 		6B58CDA31E8CBD1900963B53 /* CapturePreview.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CapturePreview.m; sourceTree = "<group>"; };
 		6B58CDA61E8CC69E00963B53 /* QRCodeReader.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = QRCodeReader.png; sourceTree = "<group>"; };
+		6B58CDA81E8CCED300963B53 /* zbar.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = zbar.xcodeproj; path = ZBarSDK/ZBar/iphone/zbar.xcodeproj; sourceTree = "<group>"; };
+		6B58CDB71E8CDA0300963B53 /* libiconv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libiconv.tbd; path = usr/lib/libiconv.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +65,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B58CDB81E8CDA0300963B53 /* libiconv.tbd in Frameworks */,
+				6B58CDB41E8CD6B800963B53 /* libzbar.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,6 +78,8 @@
 			children = (
 				6B58CD841E8CB83300963B53 /* QRCodeReader */,
 				6B58CD831E8CB83300963B53 /* Products */,
+				6B58CDA81E8CCED300963B53 /* zbar.xcodeproj */,
+				6B58CDB61E8CDA0300963B53 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -105,6 +130,23 @@
 			path = AVCamera;
 			sourceTree = "<group>";
 		};
+		6B58CDA91E8CCED300963B53 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6B58CDB01E8CCED400963B53 /* libzbar.a */,
+				6B58CDB21E8CCED400963B53 /* readertest.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6B58CDB61E8CDA0300963B53 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				6B58CDB71E8CDA0300963B53 /* libiconv.tbd */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -152,12 +194,35 @@
 			mainGroup = 6B58CD791E8CB83300963B53;
 			productRefGroup = 6B58CD831E8CB83300963B53 /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = 6B58CDA91E8CCED300963B53 /* Products */;
+					ProjectRef = 6B58CDA81E8CCED300963B53 /* zbar.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				6B58CD811E8CB83300963B53 /* QRCodeReader */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXReferenceProxy section */
+		6B58CDB01E8CCED400963B53 /* libzbar.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libzbar.a;
+			remoteRef = 6B58CDAF1E8CCED400963B53 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		6B58CDB21E8CCED400963B53 /* readertest.app */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.application;
+			path = readertest.app;
+			remoteRef = 6B58CDB11E8CCED400963B53 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+/* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
 		6B58CD801E8CB83300963B53 /* Resources */ = {
@@ -304,8 +369,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				DEVELOPMENT_TEAM = C94329WK33;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/ZBarSDK/Headers";
 				INFOPLIST_FILE = QRCodeReader/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hiscene.QRCodeReader;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -316,8 +383,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				DEVELOPMENT_TEAM = C94329WK33;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/ZBarSDK/Headers";
 				INFOPLIST_FILE = QRCodeReader/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hiscene.QRCodeReader;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -342,6 +411,7 @@
 				6B58CD9E1E8CB83300963B53 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
