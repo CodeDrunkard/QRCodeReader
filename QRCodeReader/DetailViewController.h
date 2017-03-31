@@ -8,10 +8,10 @@
 
 #import <UIKit/UIKit.h>
 
-#define EnumRawValue(enum) [@[@"Native", @"ZBar", @"ZXing"] objectAtIndex:enum]
+#define EnumRawValue(enum) [@[@"AVFoundation", @"ZBar", @"ZXing"] objectAtIndex:enum]
 
 typedef NS_ENUM(NSUInteger, QRCodeReaderType) {
-    QRCodeReaderTypeNative,
+    QRCodeReaderTypeFoundation,
     QRCodeReaderTypeZBar,
     QRCodeReaderTypeZXing,
 };

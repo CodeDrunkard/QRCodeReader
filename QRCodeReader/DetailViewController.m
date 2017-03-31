@@ -13,6 +13,13 @@
 
 #import <ZBarSDK/ZBarCaptureReader.h>
 
+#import "ZXMultiFormatReader.h"
+#import "ZXCGImageLuminanceSource.h"
+#import "ZXHybridBinarizer.h"
+#import "ZXBinaryBitmap.h"
+#import "ZXDecodeHints.h"
+#import "ZXResult.h"
+
 @interface DetailViewController () <AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureMetadataOutputObjectsDelegate, ZBarCaptureDelegate>
 
 @property (nonatomic, strong) Capture *capture;
@@ -21,6 +28,10 @@
 @property (nonatomic, strong) AVCaptureMetadataOutput *captureMetadataOutput;
 
 @property (nonatomic, strong) ZBarCaptureReader *zbarReader;
+
+@property (nonatomic, strong) ZXDecodeHints *zxingHints;
+@property (nonatomic, strong) id<ZXReader> zxingReader;
+@property (nonatomic, assign) CGRect scanRect;
 
 @end
 
@@ -35,6 +46,10 @@
     [super viewDidLoad];
 
     [self initCamera];
+    
+    _skipCount = 0;
+    _skipMaxCount = 3;
+    _scanEnable = YES;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -59,8 +74,8 @@
 
 - (void)setTypeString:(NSString *)typeString {
     _typeString = typeString;
-    if ([_typeString isEqualToString:EnumRawValue(QRCodeReaderTypeNative)]) {
-        self.type = QRCodeReaderTypeNative;
+    if ([_typeString isEqualToString:EnumRawValue(QRCodeReaderTypeFoundation)]) {
+        self.type = QRCodeReaderTypeFoundation;
     } else if ([_typeString isEqualToString:EnumRawValue(QRCodeReaderTypeZBar)]) {
         self.type = QRCodeReaderTypeZBar;
     } else if ([_typeString isEqualToString:EnumRawValue(QRCodeReaderTypeZXing)]) {
@@ -81,20 +96,23 @@
         self.capturePreview.center = self.view.center;
         self.capturePreview.session = self.capture.session;
         self.capturePreview.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [self.view insertSubview:self.capturePreview atIndex:0];
         self.capturePreview.backgroundColor = [UIColor blackColor];
+        self.capturePreview.videoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspect;
+        self.capturePreview.videoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+        [self.view insertSubview:self.capturePreview atIndex:0];
         
         dispatch_async( _captureQueue, ^{
             switch (self.type) {
-                case QRCodeReaderTypeNative:
+                case QRCodeReaderTypeFoundation:
                     [self configCaptureMetadataOutput];
                     break;
                 case QRCodeReaderTypeZBar:
                     [self initZBar];
-                    [self configCaptureVideoDataOutput];
+                    [self configCaptureVideoDataOutput:kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange];
                     break;
                 case QRCodeReaderTypeZXing:
-                    
+                    [self initZXing];
+                    [self configCaptureVideoDataOutput:kCVPixelFormatType_32BGRA];
                     break;
             }
         });
@@ -127,7 +145,7 @@
     [self.capture.session commitConfiguration];
 }
 
-- (void)configCaptureVideoDataOutput {
+- (void)configCaptureVideoDataOutput:(int)pixelBufferPixelFormatTypeKey {
     if ( self.capture.setupResult != CaptureSetupResultSuccess ) {
         return;
     }
@@ -135,7 +153,7 @@
     [self.capture.session beginConfiguration];
     
     self.captureVideoDataOutput = [[AVCaptureVideoDataOutput alloc] init];
-    [self.captureVideoDataOutput setVideoSettings:[NSDictionary dictionaryWithObject: [NSNumber numberWithInt: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
+    [self.captureVideoDataOutput setVideoSettings:[NSDictionary dictionaryWithObject: [NSNumber numberWithInt: pixelBufferPixelFormatTypeKey]
                                                                               forKey: (NSString *)kCVPixelBufferPixelFormatTypeKey]];
     [self.captureVideoDataOutput setSampleBufferDelegate:self queue:_captureQueue];
     
@@ -219,33 +237,123 @@
 }
 
 
-#pragma mark - ZBar config
+#pragma mark - ZBar Configeration
 
 - (void)initZBar {
     self.zbarReader = [[ZBarCaptureReader alloc] init];
     self.zbarReader.captureDelegate = self;
     self.zbarReader.enableReader = YES;
-    
-    _skipCount = 0;
-    _skipMaxCount = 3;
-    _scanEnable = YES;
 }
 
+#pragma mark - ZXing Configeration
+
+- (void)initZXing {
+    self.zxingReader = [ZXMultiFormatReader reader];
+    self.zxingHints = [ZXDecodeHints hints];
+}
 
 #pragma mark - AVCaptureVideoDataOutputSampleBufferDelegate
 
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection {
-    if (_scanEnable && self.type == QRCodeReaderTypeZBar) {
+    if (_scanEnable) {
         _skipCount++;
         if (_skipCount > _skipMaxCount) {
             _skipCount = 0;
-            [(id<AVCaptureVideoDataOutputSampleBufferDelegate>)_zbarReader captureOutput:captureOutput
-                                                                   didOutputSampleBuffer:sampleBuffer
-                                                                          fromConnection:connection];
+            switch (self.type) {
+                case QRCodeReaderTypeZBar: {
+                    [(id<AVCaptureVideoDataOutputSampleBufferDelegate>)_zbarReader captureOutput:captureOutput
+                                                                           didOutputSampleBuffer:sampleBuffer
+                                                                                  fromConnection:connection];
+                    break;
+                }
+                case QRCodeReaderTypeZXing: {
+                    @autoreleasepool {
+                        
+                        CVImageBufferRef videoFrame = CMSampleBufferGetImageBuffer(sampleBuffer);
+                        
+                        CGImageRef videoFrameImage = [ZXCGImageLuminanceSource createImageFromBuffer:videoFrame];
+                        CGImageRef rotatedImage = [self createRotatedImage:videoFrameImage degrees:0];
+                        CGImageRelease(videoFrameImage);
+                        
+                        // If scanRect is set, crop the current image to include only the desired rect
+                        if (!CGRectIsEmpty(self.scanRect)) {
+                            CGImageRef croppedImage = CGImageCreateWithImageInRect(rotatedImage, self.scanRect);
+                            CFRelease(rotatedImage);
+                            rotatedImage = croppedImage;
+                        }
+                        
+                        ZXCGImageLuminanceSource *source = [[ZXCGImageLuminanceSource alloc] initWithCGImage:rotatedImage];
+
+                        CGImageRelease(rotatedImage);
+                        
+                        ZXHybridBinarizer *binarizer = [[ZXHybridBinarizer alloc] initWithSource:source];
+                        
+                        ZXBinaryBitmap *bitmap = [[ZXBinaryBitmap alloc] initWithBinarizer:binarizer];
+                        
+                        NSError *error;
+                        ZXResult *result = [self.zxingReader decode:bitmap hints:self.zxingHints error:&error];
+                        if (result && error == nil) {
+                            dispatch_async(dispatch_get_main_queue(), ^{
+                                NSLog(@"ZXing scan result is: %@", result.text);
+                            });
+                        }
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
         }
     }
 }
 
+- (CGImageRef)createRotatedImage:(CGImageRef)original degrees:(float)degrees CF_RETURNS_RETAINED {
+    if (degrees == 0.0f) {
+        CGImageRetain(original);
+        return original;
+    } else {
+        double radians = degrees * M_PI / 180;
+        
+#if TARGET_OS_EMBEDDED || TARGET_IPHONE_SIMULATOR
+        radians = -1 * radians;
+#endif
+        
+        size_t _width = CGImageGetWidth(original);
+        size_t _height = CGImageGetHeight(original);
+        
+        CGRect imgRect = CGRectMake(0, 0, _width, _height);
+        CGAffineTransform __transform = CGAffineTransformMakeRotation(radians);
+        CGRect rotatedRect = CGRectApplyAffineTransform(imgRect, __transform);
+        
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        CGContextRef context = CGBitmapContextCreate(NULL,
+                                                     rotatedRect.size.width,
+                                                     rotatedRect.size.height,
+                                                     CGImageGetBitsPerComponent(original),
+                                                     0,
+                                                     colorSpace,
+                                                     kCGBitmapAlphaInfoMask & kCGImageAlphaPremultipliedFirst);
+        CGContextSetAllowsAntialiasing(context, FALSE);
+        CGContextSetInterpolationQuality(context, kCGInterpolationNone);
+        CGColorSpaceRelease(colorSpace);
+        
+        CGContextTranslateCTM(context,
+                              +(rotatedRect.size.width/2),
+                              +(rotatedRect.size.height/2));
+        CGContextRotateCTM(context, radians);
+        
+        CGContextDrawImage(context, CGRectMake(-imgRect.size.width/2,
+                                               -imgRect.size.height/2,
+                                               imgRect.size.width,
+                                               imgRect.size.height),
+                           original);
+        
+        CGImageRef rotatedImage = CGBitmapContextCreateImage(context);
+        CFRelease(context);
+        
+        return rotatedImage;
+    }
+}
 
 #pragma mark - AVCaptureMetadataOutputObjectsDelegate
 

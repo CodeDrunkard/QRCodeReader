@@ -20,7 +20,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.objects = @[EnumRawValue(QRCodeReaderTypeNative), EnumRawValue(QRCodeReaderTypeZBar), EnumRawValue(QRCodeReaderTypeZXing)];
+    self.objects = @[EnumRawValue(QRCodeReaderTypeFoundation), EnumRawValue(QRCodeReaderTypeZBar), EnumRawValue(QRCodeReaderTypeZXing)];
     
     self.detailViewController = (DetailViewController *)[[self.splitViewController.viewControllers lastObject] topViewController];
     self.tableView.tableFooterView = [UIView new];
